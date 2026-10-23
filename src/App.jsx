@@ -20,13 +20,15 @@ import EditArtistModal from "./components/EditArtistModal";
 import YouTubeMusicView from "./components/YouTubeMusicView";
 import AuthModal from "./components/AuthModal";
 import RecommendationsView from "./components/RecommendationsView";
-import { Play, Sparkles, Heart, Volume2, Search, Loader2, Flame } from "lucide-react";
+import ChillStarryCanvas from "./components/ChillStarryCanvas";
+import { Play, Sparkles, Heart, Volume2, Search, Loader2, Flame, Moon } from "lucide-react";
 
 export default function App() {
   const [songs, setSongs] = useState([]);
   const [activeTab, setActiveTab] = useState("discover"); // discover, youtube, charts, lyrics, genres, favorites
   const [selectedGenre, setSelectedGenre] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
+  const [isChillMode, setIsChillMode] = useState(false);
   const [ytTrendingSongs, setYtTrendingSongs] = useState([]);
   const [ytSearchResults, setYtSearchResults] = useState([]);
   const [isSearchingYt, setIsSearchingYt] = useState(false);
@@ -867,7 +869,10 @@ export default function App() {
   ];
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${isChillMode ? 'chill-mode-active' : ''}`}>
+      {/* Bầu trời sao đêm & sao băng rơi (Chill Mode Canvas Engine) */}
+      <ChillStarryCanvas isChillMode={isChillMode} isPlaying={isPlaying} />
+
       {/* YouTube Vinyl Record Disk Player */}
       {currentSong?.isYouTube && currentSong.youtubeId && (
         <YouTubePlayer 
@@ -918,6 +923,15 @@ export default function App() {
         onOpenAuthModal={() => setShowAuthModal(true)}
         onLogout={handleLogout}
         onSelectRecommendationsTab={() => handleTabChange("recommendations")}
+        isChillMode={isChillMode}
+        onToggleChillMode={() => {
+          setIsChillMode(prev => {
+            const next = !prev;
+            setToastMessage(next ? "🌌 Đã bật Chế độ Chill: Bầu trời sao đêm & sao băng rơi" : "🌙 Đã tắt Chế độ Chill");
+            setTimeout(() => setToastMessage(""), 3000);
+            return next;
+          });
+        }}
       />
 
       {/* Main View Area */}
@@ -971,7 +985,14 @@ export default function App() {
                 return (
                   <button
                     key={filter.id}
-                    onClick={() => setSelectedGenre(filter.id)}
+                    onClick={() => {
+                      setSelectedGenre(filter.id);
+                      if (filter.id === "Ballad") {
+                        setIsChillMode(true);
+                        setToastMessage("🌌 Đã kích hoạt Mode Chill: Bầu trời sao đêm & sao băng rơi");
+                        setTimeout(() => setToastMessage(""), 3000);
+                      }
+                    }}
                     style={{
                       height: "38px",
                       padding: "0 22px",

@@ -893,3 +893,59 @@ input.search-bar::placeholder,
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
+/* ============================================================ */
+/* MODE CHILL - COSMIC STARRY SKY & TRANSLUCENT GLASS OVERLAYS  */
+/* ============================================================ */
+.chill-mode-active {
+  transition: background 0.8s ease;
+}
+
+.chill-mode-active .app-sidebar {
+  background: rgba(10, 10, 22, 0.68) !important;
+  border-right-color: rgba(168, 85, 247, 0.25) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+}
+
+.chill-mode-active .app-header {
+  background: rgba(8, 8, 18, 0.58) !important;
+  border-bottom-color: rgba(168, 85, 247, 0.2) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+}
+
+.chill-mode-active .app-main {
+  background: transparent !important;
+  position: relative;
+  z-index: 1;
+}
+
+.chill-mode-active .app-player {
+  background: rgba(10, 10, 22, 0.88) !important;
+  border-top-color: rgba(168, 85, 247, 0.3) !important;
+  backdrop-filter: blur(28px) !important;
+  -webkit-backdrop-filter: blur(28px) !important;
+}
+
+.chill-mode-active .hero-banner {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.18) 0%, rgba(59, 130, 246, 0.12) 50%, rgba(10, 10, 24, 0.65) 100%) !important;
+  border-color: rgba(192, 132, 252, 0.35) !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 25px rgba(168, 85, 247, 0.18) !important;
+}
+
+.chill-mode-active .trending-card,
+.chill-mode-active .song-card {
+  background: rgba(255, 255, 255, 0.035) !important;
+  border-color: rgba(168, 85, 247, 0.15) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+
+.chill-mode-active .trending-card:hover,
+.chill-mode-active .song-card:hover {
+  background: rgba(168, 85, 247, 0.08) !important;
+  border-color: rgba(192, 132, 252, 0.4) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(168, 85, 247, 0.25) !important;
+}
+
+

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Upload, User, ChevronLeft, ChevronRight, LogIn, LogOut, Sparkles, History, ChevronDown } from 'lucide-react';
+import { Search, Upload, User, ChevronLeft, ChevronRight, LogIn, LogOut, Sparkles, History, ChevronDown, Moon } from 'lucide-react';
 
 export default function Header({ 
   searchTerm, 
@@ -12,7 +12,9 @@ export default function Header({
   currentUser,
   onOpenAuthModal,
   onLogout,
-  onSelectRecommendationsTab
+  onSelectRecommendationsTab,
+  isChillMode,
+  onToggleChillMode
 }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -79,7 +81,34 @@ export default function Header({
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        {/* Toggle Mode Chill */}
+        <button
+          onClick={onToggleChillMode}
+          title={isChillMode ? "Tắt Chế độ Chill" : "Bật Chế độ Chill: Bầu trời sao đêm & sao băng rơi"}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '7px',
+            padding: '7px 16px',
+            borderRadius: '24px',
+            border: isChillMode ? '1px solid #c084fc' : '1px solid rgba(255, 255, 255, 0.15)',
+            background: isChillMode 
+              ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.35), rgba(99, 102, 241, 0.25))' 
+              : 'rgba(255, 255, 255, 0.05)',
+            color: isChillMode ? '#e9d5ff' : 'var(--text-secondary)',
+            boxShadow: isChillMode ? '0 0 20px rgba(168, 85, 247, 0.5), inset 0 0 10px rgba(192, 132, 252, 0.3)' : 'none',
+            cursor: 'pointer',
+            fontSize: '0.84rem',
+            fontWeight: 700,
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            backdropFilter: 'blur(8px)'
+          }}
+        >
+          <Moon size={15} color={isChillMode ? '#c084fc' : '#94a3b8'} />
+          <span>{isChillMode ? '🌌 Mode Chill: Bật' : '🌙 Mode Chill'}</span>
+        </button>
+
         <button className="btn-cyber-action" onClick={onOpenUpload}>
           <Upload size={16} />
           <span>Upload Nhạc</span>
