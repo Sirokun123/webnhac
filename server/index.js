@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import mongoose from 'mongoose';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
@@ -740,11 +741,52 @@ app.get('/api/songs', async (req, res) => {
       query.isTrending = true;
     }
 
-    const songs = await Song.find(query).sort({ createdAt: -1 });
-    res.json({ success: true, count: songs.length, data: songs });
+    const songs = await Song.find(query).sort({ lastPlayedAt: -1, updatedAt: -1, createdAt: -1 });
+
+    // Đảm bảo không bao giờ trùng lặp bài hát
+    const uniqueSongs = [];
+    const seen = new Set();
+    for (const song of songs) {
+      const key = song.youtubeId ? `yt_${song.youtubeId}` : `t_${song.title.trim().toLowerCase()}_${song.artist.trim().toLowerCase()}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueSongs.push(song);
+      }
+    }
+
+    res.json({ success: true, count: uniqueSongs.length, data: uniqueSongs });
   } catch (error) {
     console.error('GET /api/songs error:', error);
     res.status(500).json({ success: false, message: 'Lỗi khi lấy danh sách bài hát' });
+  }
+});
+
+// POST /api/songs/record-play - Cập nhật thời điểm nghe gần nhất (lastPlayedAt) và lượt nghe
+app.post('/api/songs/record-play', async (req, res) => {
+  try {
+    const { id, youtubeId, title, artist } = req.body;
+    let song = null;
+    if (id && mongoose.Types.ObjectId.isValid(id)) {
+      song = await Song.findById(id);
+    }
+    if (!song && youtubeId) {
+      song = await Song.findOne({ youtubeId });
+    }
+    if (!song && title) {
+      song = await Song.findOne({
+        title: new RegExp(`^${title.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
+      });
+    }
+
+    if (song) {
+      song.lastPlayedAt = new Date();
+      song.views = (song.views || 0) + 1;
+      await song.save();
+      return res.json({ success: true, data: song });
+    }
+    res.json({ success: false, message: 'Bài hát chưa có trong thư viện' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
@@ -1506,6 +1548,7 @@ app.post('/api/youtube/play-or-create', async (req, res) => {
     let song = await Song.findOne({ youtubeId: videoId });
     if (song) {
       song.views = (song.views || 0) + 1;
+      song.lastPlayedAt = new Date();
       await song.save();
       return res.json({ success: true, isNew: false, data: song });
     }
@@ -1558,12 +1601,22 @@ app.post('/api/youtube/play-or-create', async (req, res) => {
       views: (ytDetails?.views && ytDetails.views > 0) ? ytDetails.views : (Math.floor(Math.random() * 5000) + 1200),
       isTrending: true,
       lyrics: parsedLyrics,
-      artistId: artistDoc ? artistDoc._id : null
+      artistId: artistDoc ? artistDoc._id : null,
+      lastPlayedAt: new Date()
     });
 
     console.log(`[Instant YouTube Play] Created new song in DB: "${songTitle}" - "${songArtist}"`);
     return res.json({ success: true, isNew: true, data: song });
   } catch (err) {
+    if (err.code === 11000) {
+      const existing = await Song.findOne({ youtubeId: videoId });
+      if (existing) {
+        existing.lastPlayedAt = new Date();
+        existing.views = (existing.views || 0) + 1;
+        await existing.save();
+        return res.json({ success: true, isNew: false, data: existing });
+      }
+    }
     console.error('play-or-create error:', err);
     return res.status(500).json({ success: false, message: 'Lỗi phát bài hát YouTube' });
   }

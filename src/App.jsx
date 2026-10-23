@@ -119,9 +119,22 @@ export default function App() {
       if (!res.ok) return;
       const data = await res.json();
       if (data && data.success && Array.isArray(data.data)) {
-        setSongs(data.data);
-        if (!currentSong && data.data.length > 0) {
-          const firstSong = data.data[0];
+        // Strict deduplication to ensure unique songs
+        const unique = [];
+        const seen = new Set();
+        for (const s of data.data) {
+          const key = s.youtubeId 
+            ? `yt_${s.youtubeId}` 
+            : `t_${s.title?.trim().toLowerCase()}_${s.artist?.trim().toLowerCase()}`;
+          if (!seen.has(key) && !seen.has(s.id)) {
+            seen.add(key);
+            if (s.id) seen.add(s.id);
+            unique.push(s);
+          }
+        }
+        setSongs(unique);
+        if (!currentSong && unique.length > 0) {
+          const firstSong = unique[0];
           setCurrentSong(firstSong);
           setDurationSec(firstSong.durationSec || 45);
           if (!firstSong.isYouTube) {
@@ -475,8 +488,54 @@ export default function App() {
     } catch (e) {}
   };
 
+  // Đưa bài hát vừa chọn lên vị trí đầu tiên (ở trước các bài khác) & loại bỏ trùng lặp
+  const promoteSongToTop = (song) => {
+    if (!song) return;
+    setSongs(prev => {
+      const targetId = song.id;
+      const targetYt = song.youtubeId;
+      const normTitle = song.title?.trim().toLowerCase();
+      const normArtist = song.artist?.trim().toLowerCase();
+
+      // Tìm thông tin bài hát hiện có để giữ lại data đầy đủ nhất
+      const existing = prev.find(s => 
+        (targetId && s.id === targetId) ||
+        (targetYt && s.youtubeId === targetYt) ||
+        (normTitle && s.title?.trim().toLowerCase() === normTitle && normArtist && s.artist?.trim().toLowerCase() === normArtist)
+      );
+
+      const songToPlace = existing 
+        ? { ...existing, ...song, lastPlayedAt: new Date().toISOString() } 
+        : { ...song, lastPlayedAt: new Date().toISOString() };
+
+      // Lọc bỏ tất cả bản sao của bài hát này trong danh sách còn lại
+      const remaining = prev.filter(s => 
+        (!targetId || s.id !== targetId) &&
+        (!targetYt || s.youtubeId !== targetYt) &&
+        !(normTitle && s.title?.trim().toLowerCase() === normTitle && normArtist && s.artist?.trim().toLowerCase() === normArtist)
+      );
+
+      return [songToPlace, ...remaining];
+    });
+
+    // Đồng bộ thời điểm nghe lên backend MongoDB Atlas
+    fetch("/api/songs/record-play", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: song.id,
+        youtubeId: song.youtubeId,
+        title: song.title,
+        artist: song.artist
+      })
+    }).catch(() => {});
+  };
+
   // Handle Play Song
   const handlePlaySong = (song) => {
+    // Đưa bài hát lên đầu danh sách ngay khi nghe
+    promoteSongToTop(song);
+
     if (currentSong && currentSong.id === song.id) {
       if (isPlaying) {
         if (!song.isYouTube) safePauseAudio();
@@ -564,12 +623,14 @@ export default function App() {
         const songDoc = result.data;
         // Seamlessly update active lyrics and metadata without restarting audio
         setCurrentSong(prev => (prev?.youtubeId === vId ? { ...prev, ...songDoc, isYouTube: true } : prev));
-        // Add to library
+        // Add to library at top without duplication
         setSongs(prev => {
-          if (!prev.some(s => s.id === songDoc.id || s.youtubeId === songDoc.youtubeId)) {
-            return [songDoc, ...prev];
-          }
-          return prev.map(s => s.youtubeId === vId ? songDoc : s);
+          const remaining = prev.filter(s => 
+            s.id !== songDoc.id && 
+            s.youtubeId !== songDoc.youtubeId && 
+            !(s.title?.trim().toLowerCase() === songDoc.title?.trim().toLowerCase() && s.artist?.trim().toLowerCase() === songDoc.artist?.trim().toLowerCase())
+          );
+          return [songDoc, ...remaining];
         });
       }
     })
@@ -767,7 +828,21 @@ export default function App() {
       );
     }
 
-    return list;
+    // Đảm bảo không trùng lặp: Mỗi bài hát chỉ hiển thị đúng 1 lần
+    const unique = [];
+    const seen = new Set();
+    for (const song of list) {
+      const key = song.youtubeId 
+        ? `yt_${song.youtubeId}` 
+        : `t_${song.title?.trim().toLowerCase()}_${song.artist?.trim().toLowerCase()}`;
+      if (!seen.has(key) && !seen.has(song.id)) {
+        seen.add(key);
+        if (song.id) seen.add(song.id);
+        unique.push(song);
+      }
+    }
+
+    return unique;
   };
 
   const filteredSongs = getFilteredSongs();

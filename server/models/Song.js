@@ -25,8 +25,12 @@ const songSchema = new mongoose.Schema({
   chartRank: { type: Number, default: 1 },
   isLiked: { type: Boolean, default: false },
   offset: { type: Number, default: 0 },
+  lastPlayedAt: { type: Date, default: Date.now },
   lyrics: [lyricSchema]
 }, { timestamps: true });
+
+songSchema.index({ youtubeId: 1 }, { unique: true, sparse: true });
+songSchema.index({ lastPlayedAt: -1, createdAt: -1 });
 
 // Transform _id to id for seamless frontend compatibility
 songSchema.set('toJSON', {
