@@ -7,6 +7,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
 import axios from 'axios';
+import { YoutubeTranscript } from 'youtube-transcript';
 import { connectDB } from './config/db.js';
 import {
   getYouTubeApiKey,
@@ -837,6 +838,38 @@ app.put('/api/songs/:id/lyrics', async (req, res) => {
   }
 });
 
+// POST /api/songs/:id/refresh-lyrics - Tự động cào lại lời từ YouTube Captions / LRCLIB
+app.post('/api/songs/:id/refresh-lyrics', async (req, res) => {
+  try {
+    const song = await Song.findById(req.params.id);
+    if (!song) {
+      return res.status(404).json({ success: false, message: 'Bài hát không tồn tại' });
+    }
+
+    const yId = song.youtubeId || (req.body.youtubeId ? req.body.youtubeId : null);
+    const lyrics = await resolveLyrics(yId, song.artist, song.title, song.durationSec);
+
+    if (lyrics && lyrics.length > 1) {
+      song.lyrics = lyrics;
+      await song.save();
+      return res.json({
+        success: true,
+        message: `Đã tìm thấy và cập nhật ${lyrics.length} câu lời bài hát tự động!`,
+        data: song
+      });
+    }
+
+    return res.json({
+      success: false,
+      message: 'Chưa tìm thấy phụ đề tự động trên YouTube hoặc LRCLIB. Bạn có thể tự thêm lời thủ công!',
+      data: song
+    });
+  } catch (err) {
+    console.error('Refresh lyrics error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 
 // PUT /api/songs/:id - Update full song details (Title, Artist, Genre, Cover, Lyrics)
 app.put("/api/songs/:id", async (req, res) => {
@@ -1216,6 +1249,81 @@ async function fetchLrcLibLyrics(artist, title, durationSec) {
   return null;
 }
 
+// Trích xuất phụ đề tự động trực tiếp từ YouTube Video (CC subtitles tiếng Việt & quốc tế)
+async function fetchYouTubeCaptionsAsLyrics(videoId) {
+  if (!videoId) return null;
+  try {
+    let transcript = null;
+    // Ưu tiên phụ đề tiếng Việt trước
+    try {
+      transcript = await YoutubeTranscript.fetchTranscript(videoId, { lang: 'vi' });
+    } catch (e1) {
+      // Nếu không có tiếng Việt, lấy ngôn ngữ gốc/bất kỳ của video
+      try {
+        transcript = await YoutubeTranscript.fetchTranscript(videoId);
+      } catch (e2) {}
+    }
+
+    if (!transcript || !Array.isArray(transcript) || transcript.length === 0) {
+      return null;
+    }
+
+    const lyrics = [];
+    for (const item of transcript) {
+      let text = (item.text || '').trim();
+      text = text
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/^[♪♫♬\s]+|[♪♫♬\s]+$/g, '')
+        .trim();
+
+      if (!text || text === '[âm nhạc]' || text === '[Music]') continue;
+
+      const timeInSec = Math.round((item.offset / 1000) * 10) / 10;
+      lyrics.push({
+        time: timeInSec,
+        text: text
+      });
+    }
+
+    return lyrics.length > 0 ? lyrics : null;
+  } catch (err) {
+    console.warn(`[YouTube Captions Scraper] Warning for ${videoId}:`, err.message);
+    return null;
+  }
+}
+
+// Bộ giải pháp lấy lời thông minh đa tầng: LRCLIB -> YouTube Captions (CC) -> Fallback
+async function resolveLyrics(videoId, artist, title, durationSec) {
+  // 1. Tìm trên LRCLIB trước (Lời chuẩn karaoke)
+  try {
+    const lrc = await fetchLrcLibLyrics(artist, title, durationSec);
+    if (lrc) {
+      const parsed = parseLyrics(lrc, durationSec);
+      if (parsed.length > 1) {
+        return parsed;
+      }
+    }
+  } catch (e) {}
+
+  // 2. Cào phụ đề YouTube Captions nếu video có CC
+  if (videoId) {
+    try {
+      const ytLyrics = await fetchYouTubeCaptionsAsLyrics(videoId);
+      if (ytLyrics && ytLyrics.length > 1) {
+        console.log(`[Lyrics Resolver] Đã lấy thành công ${ytLyrics.length} câu lời từ YouTube Captions cho "${title}" (${videoId})`);
+        return ytLyrics;
+      }
+    } catch (e) {}
+  }
+
+  // 3. Fallback placeholder
+  return parseLyrics(`🎶 ${title} - ${artist}`, durationSec);
+}
+
 // Helper to extract all YouTube video IDs from a playlist page string or multiline URLs
 function extractAllYouTubeIds(inputStr) {
   if (!inputStr) return [];
@@ -1549,6 +1657,13 @@ app.post('/api/youtube/play-or-create', async (req, res) => {
     if (song) {
       song.views = (song.views || 0) + 1;
       song.lastPlayedAt = new Date();
+      // Tự động bổ sung phụ đề/lời nếu bài hiện tại chưa có lời (hoặc chỉ có 1 dòng placeholder)
+      if (!song.lyrics || song.lyrics.length <= 1) {
+        const enriched = await resolveLyrics(videoId, song.artist, song.title, song.durationSec);
+        if (enriched && enriched.length > 1) {
+          song.lyrics = enriched;
+        }
+      }
       await song.save();
       return res.json({ success: true, isNew: false, data: song });
     }
@@ -1574,13 +1689,8 @@ app.post('/api/youtube/play-or-create', async (req, res) => {
       }
     }
 
-    // Auto-fetch LRCLIB lyrics & calculate intro sync
-    const [fetchedLyrics, musicStartTime] = await Promise.all([
-      fetchLrcLibLyrics(songArtist, songTitle, durationSec).catch(() => null),
-      getMusicStartTime(videoId).catch(() => 0)
-    ]);
-
-    const parsedLyrics = parseLyrics(fetchedLyrics || `🎶 ${songTitle} - ${songArtist}`, durationSec);
+    // Tự động tìm kiếm lời đa nguồn: LRCLIB (LRC đồng bộ) -> Cào phụ đề YouTube Captions (CC)
+    const parsedLyrics = await resolveLyrics(videoId, songArtist, songTitle, durationSec);
     const genre = detectGenreCustom(songTitle, songArtist);
 
     // Auto find-or-create artist in DB
@@ -1605,7 +1715,7 @@ app.post('/api/youtube/play-or-create', async (req, res) => {
       lastPlayedAt: new Date()
     });
 
-    console.log(`[Instant YouTube Play] Created new song in DB: "${songTitle}" - "${songArtist}"`);
+    console.log(`[Instant YouTube Play] Created new song in DB: "${songTitle}" - "${songArtist}" (Lyrics: ${parsedLyrics.length} lines)`);
     return res.json({ success: true, isNew: true, data: song });
   } catch (err) {
     if (err.code === 11000) {

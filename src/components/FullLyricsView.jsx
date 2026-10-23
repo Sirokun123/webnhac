@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { 
   Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, 
-  Volume2, VolumeX, MoreHorizontal, Zap, CheckCircle2 
+  Volume2, VolumeX, MoreHorizontal, Zap, CheckCircle2, Sparkles 
 } from "lucide-react";
 
 export default function FullLyricsView({ 
@@ -182,6 +182,35 @@ export default function FullLyricsView({
     }
   };
 
+  const [isFetchingLyrics, setIsFetchingLyrics] = useState(false);
+
+  const handleAutoFetchLyrics = async () => {
+    if (!currentSong?.id || isFetchingLyrics) return;
+    setIsFetchingLyrics(true);
+    setSyncMsg("⏳ Đang cào phụ đề YouTube & LRCLIB...");
+    try {
+      const res = await fetch(`/api/songs/${currentSong.id}/refresh-lyrics`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ youtubeId: currentSong.youtubeId })
+      });
+      const data = await res.json();
+      if (data && data.success && data.data) {
+        if (onSongUpdate) {
+          onSongUpdate(data.data);
+        }
+        setSyncMsg(`✓ ${data.message}`);
+      } else {
+        setSyncMsg(data?.message || "Không tìm thấy phụ đề tự động");
+      }
+    } catch (e) {
+      setSyncMsg("Lỗi khi tải phụ đề tự động");
+    } finally {
+      setIsFetchingLyrics(false);
+      setTimeout(() => setSyncMsg(""), 4500);
+    }
+  };
+
   const formatTime = (secs) => {
     if (isNaN(secs) || secs < 0) return "0:00";
     const m = Math.floor(secs / 60);
@@ -318,32 +347,55 @@ export default function FullLyricsView({
               <MoreHorizontal size={16} style={{ cursor: "pointer", opacity: 0.8 }} />
             </div>
 
-            {/* 1-Click Sync Button */}
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "8px" }}>
-              <button
-                onClick={handleSyncFirstLine}
-                title="Bấm khi ca sĩ vừa cất từ đầu tiên để đồng bộ mốc thời gian lời hát 100%"
-                style={{
-                  padding: "6px 16px",
-                  borderRadius: "20px",
-                  border: `1px solid ${mainRgb}`,
-                  background: `rgba(${r}, ${g}, ${b}, 0.25)`,
-                  color: "#ffffff",
-                  fontSize: "0.78rem",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  boxShadow: `0 0 15px rgba(${r}, ${g}, ${b}, 0.35)`,
-                  transition: "all 0.2s ease"
-                }}
-              >
-                <Zap size={14} color="#00f2fe" /> 1-Click Căn Nhịp Dòng Đầu
-              </button>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "center" }}>
+                <button
+                  onClick={handleSyncFirstLine}
+                  title="Bấm khi ca sĩ vừa cất từ đầu tiên để đồng bộ mốc thời gian lời hát 100%"
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: "20px",
+                    border: `1px solid ${mainRgb}`,
+                    background: `rgba(${r}, ${g}, ${b}, 0.25)`,
+                    color: "#ffffff",
+                    fontSize: "0.76rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    boxShadow: `0 0 15px rgba(${r}, ${g}, ${b}, 0.35)`,
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  <Zap size={13} color="#00f2fe" /> Căn Nhịp Dòng Đầu
+                </button>
+
+                <button
+                  onClick={handleAutoFetchLyrics}
+                  disabled={isFetchingLyrics}
+                  title="Tự động cào phụ đề tiếng Việt từ video YouTube hoặc thư viện LRCLIB"
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: "20px",
+                    border: "1px solid rgba(0, 242, 254, 0.45)",
+                    background: "rgba(0, 242, 254, 0.16)",
+                    color: "#00f2fe",
+                    fontSize: "0.76rem",
+                    fontWeight: 700,
+                    cursor: isFetchingLyrics ? "wait" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    boxShadow: "0 0 15px rgba(0, 242, 254, 0.25)",
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  <Sparkles size={13} color="#00f2fe" /> {isFetchingLyrics ? "Đang cào phụ đề..." : "⚡ Cào Lời YouTube (CC)"}
+                </button>
+              </div>
 
               {syncMsg && (
-                <span style={{ fontSize: "0.74rem", color: "#00f5d4", marginTop: "6px", display: "flex", alignItems: "center", gap: "4px" }}>
+                <span style={{ fontSize: "0.74rem", color: "#00f5d4", marginTop: "8px", display: "flex", alignItems: "center", gap: "4px" }}>
                   <CheckCircle2 size={12} /> {syncMsg}
                 </span>
               )}
