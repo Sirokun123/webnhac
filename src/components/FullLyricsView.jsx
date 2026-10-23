@@ -347,6 +347,8 @@ export default function FullLyricsView({
               <MoreHorizontal size={16} style={{ cursor: "pointer", opacity: 0.8 }} />
             </div>
 
+            {/* Sync & Auto-Lyrics Buttons */}
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "8px" }}>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "center" }}>
                 <button
                   onClick={handleSyncFirstLine}
