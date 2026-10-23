@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Disc, AlertCircle } from 'lucide-react';
 
 export default function YouTubePlayer({ 
   youtubeId, 
@@ -190,94 +189,26 @@ export default function YouTubePlayer({
   };
 
   return (
-    <div style={{
-      position: 'fixed',
-      bottom: '100px',
-      left: '24px',
-      width: '180px',
-      height: '180px',
-      borderRadius: '50%',
-      overflow: 'hidden',
-      boxShadow: '0 12px 35px rgba(0,0,0,0.8), 0 0 20px rgba(162, 56, 255, 0.4)',
-      border: '3px solid var(--accent-primary)',
-      zIndex: 99,
-      background: '#0a0a12',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
-    }}>
+    <div 
+      style={{
+        position: 'fixed',
+        top: '-9999px',
+        left: '-9999px',
+        width: '1px',
+        height: '1px',
+        opacity: 0,
+        pointerEvents: 'none',
+        zIndex: -9999
+      }}
+    >
       {/* Hidden YouTube Iframe Container */}
       <div 
         ref={containerRef}
         style={{
-          position: 'absolute',
-          top: '-9999px',
-          left: '-9999px',
           width: '200px',
-          height: '200px',
-          pointerEvents: 'none'
+          height: '200px'
         }}
       />
-
-      {/* Decorative Vinyl Disk Cover */}
-      <div 
-        className={`track-disk ${isPlaying ? 'playing' : ''}`}
-        style={{
-          width: '100%',
-          height: '100%',
-          borderRadius: '50%',
-          backgroundImage: `url(${coverUrl || "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80"})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          position: 'relative'
-        }}
-      >
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: '40px',
-          height: '40px',
-          background: '#08090e',
-          borderRadius: '50%',
-          border: '3px solid #00f2fe',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: '0 0 10px rgba(0, 242, 254, 0.5)'
-        }}>
-          <Disc size={18} color="#00f2fe" />
-        </div>
-      </div>
-
-      {/* Autoplay block notification overlay */}
-      {autoplayBlocked && (
-        <div 
-          onClick={handleManualPlay}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            background: 'rgba(0,0,0,0.85)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            padding: '10px',
-            textAlign: 'center',
-            zIndex: 10
-          }}
-        >
-          <AlertCircle size={28} color="#00f2fe" style={{ marginBottom: '4px' }} />
-          <span style={{ fontSize: '0.75rem', color: '#fff', fontWeight: 700 }}>
-            Nhấn để phát nhạc
-          </span>
-        </div>
-      )}
     </div>
   );
 }
