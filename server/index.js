@@ -1674,10 +1674,11 @@ app.post('/api/youtube/play-or-create', async (req, res) => {
     let coverUrl = clientCover || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
     let durationFormatted = clientDuration || '03:45';
     let durationSec = clientDurationSec || 225;
-    let ytViews = 1500;
+    let ytViews = Math.floor(Math.random() * 5000) + 1200;
+    let ytDetails = null;
 
     if (!clientTitle || !clientDurationSec) {
-      const ytDetails = await getYouTubeVideoDetails(videoId).catch(() => null);
+      ytDetails = await getYouTubeVideoDetails(videoId).catch(() => null);
       if (ytDetails) {
         const parsed = parseTitleCustom(ytDetails.title, ytDetails.channelTitle);
         songTitle = parsed.title;
@@ -1708,7 +1709,7 @@ app.post('/api/youtube/play-or-create', async (req, res) => {
       duration: durationFormatted,
       durationSec: durationSec,
       genre: genre || "Pop",
-      views: (ytDetails?.views && ytDetails.views > 0) ? ytDetails.views : (Math.floor(Math.random() * 5000) + 1200),
+      views: (ytDetails && ytDetails.views > 0) ? ytDetails.views : ytViews,
       isTrending: true,
       lyrics: parsedLyrics,
       artistId: artistDoc ? artistDoc._id : null,

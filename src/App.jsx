@@ -494,26 +494,28 @@ export default function App() {
     setSongs(prev => {
       const targetId = song.id;
       const targetYt = song.youtubeId;
-      const normTitle = song.title?.trim().toLowerCase();
-      const normArtist = song.artist?.trim().toLowerCase();
+      const normTitle = (song.title || "").trim().toLowerCase();
+      const normArtist = (song.artist || "").trim().toLowerCase();
+
+      const matchesSong = (s) => {
+        if (!s) return false;
+        if (targetId && s.id === targetId) return true;
+        if (targetYt && s.youtubeId === targetYt) return true;
+        const sTitle = (s.title || "").trim().toLowerCase();
+        const sArtist = (s.artist || "").trim().toLowerCase();
+        if (normTitle && sTitle === normTitle && normArtist && sArtist === normArtist) return true;
+        return false;
+      };
 
       // Tìm thông tin bài hát hiện có để giữ lại data đầy đủ nhất
-      const existing = prev.find(s => 
-        (targetId && s.id === targetId) ||
-        (targetYt && s.youtubeId === targetYt) ||
-        (normTitle && s.title?.trim().toLowerCase() === normTitle && normArtist && s.artist?.trim().toLowerCase() === normArtist)
-      );
+      const existing = prev.find(matchesSong);
 
       const songToPlace = existing 
         ? { ...existing, ...song, lastPlayedAt: new Date().toISOString() } 
         : { ...song, lastPlayedAt: new Date().toISOString() };
 
       // Lọc bỏ tất cả bản sao của bài hát này trong danh sách còn lại
-      const remaining = prev.filter(s => 
-        (!targetId || s.id !== targetId) &&
-        (!targetYt || s.youtubeId !== targetYt) &&
-        !(normTitle && s.title?.trim().toLowerCase() === normTitle && normArtist && s.artist?.trim().toLowerCase() === normArtist)
-      );
+      const remaining = prev.filter(s => !matchesSong(s));
 
       return [songToPlace, ...remaining];
     });
@@ -805,39 +807,47 @@ export default function App() {
   };
 
   // Filtered Songs
+  // Filtered Songs
   const getFilteredSongs = () => {
-    let list = [...songs];
-    if (searchTerm) {
-      const q = searchTerm.toLowerCase();
-      list = list.filter(s => 
-        s.title.toLowerCase().includes(q) || 
-        s.artist.toLowerCase().includes(q) ||
-        s.genre.toLowerCase().includes(q)
-      );
+    let list = Array.isArray(songs) ? [...songs] : [];
+    if (searchTerm && searchTerm.trim()) {
+      const q = searchTerm.trim().toLowerCase();
+      list = list.filter(s => {
+        if (!s) return false;
+        const title = (s.title || "").toLowerCase();
+        const artist = (s.artist || "").toLowerCase();
+        const genre = (s.genre || "").toLowerCase();
+        return title.includes(q) || artist.includes(q) || genre.includes(q);
+      });
     }
 
     if (activeTab === "favorites") {
-      list = list.filter(s => s.isLiked);
+      list = list.filter(s => s && s.isLiked);
     }
 
     if (selectedGenre !== "All") {
-      const target = selectedGenre.toLowerCase();
-      list = list.filter(s => 
-        s.genre?.toLowerCase().includes(target) || 
-        target.includes(s.genre?.toLowerCase() || "")
-      );
+      const target = (selectedGenre || "").toLowerCase();
+      list = list.filter(s => {
+        if (!s) return false;
+        const g = (s.genre || "").toLowerCase();
+        return g.includes(target) || target.includes(g);
+      });
     }
 
     // Đảm bảo không trùng lặp: Mỗi bài hát chỉ hiển thị đúng 1 lần
     const unique = [];
     const seen = new Set();
     for (const song of list) {
+      if (!song) continue;
+      const title = (song.title || "").trim().toLowerCase();
+      const artist = (song.artist || "").trim().toLowerCase();
       const key = song.youtubeId 
         ? `yt_${song.youtubeId}` 
-        : `t_${song.title?.trim().toLowerCase()}_${song.artist?.trim().toLowerCase()}`;
-      if (!seen.has(key) && !seen.has(song.id)) {
+        : `t_${title}_${artist}`;
+      const sid = song.id ? String(song.id) : null;
+      if (!seen.has(key) && (!sid || !seen.has(sid))) {
         seen.add(key);
-        if (song.id) seen.add(song.id);
+        if (sid) seen.add(sid);
         unique.push(song);
       }
     }
